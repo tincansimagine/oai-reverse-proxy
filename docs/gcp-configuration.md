@@ -33,3 +33,4 @@ Users can send these model IDs to the proxy to invoke the corresponding models.
   - `claude-3-sonnet@20240229`
   - `claude-3-opus@20240229`
   - `claude-3-5-sonnet@20240620`
+  = `claude-3-5-sonnet-v2@20241022`

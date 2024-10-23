@@ -37,6 +37,7 @@ const getModelsResponse = () => {
     "claude-3-sonnet@20240229",
     "claude-3-opus@20240229",
     "claude-3-5-sonnet@20240620",
+    "claude-3-5-sonnet-v2@20241022"
   ];
 
   const models = variants.map((id) => ({
@@ -158,12 +159,9 @@ function maybeReassignModel(req: Request) {
   // - claude-v1
   // - claude-2.1
   // - claude-3-5-sonnet-20240620-v1:0
-  const pattern =
-    /^(claude-)?(instant-)?(v)?(\d+)([.-](\d{1}))?(-\d+k)?(-sonnet-|-opus-|-haiku-)?(\d*)/i;
+  const pattern = /^(claude-)?(instant-)?(v)?(\d+)([.-](\d{1}))?(-\d+k)?(-sonnet-|-opus-|-haiku-)?(\d*)(-v\d+)?/i;
   const match = model.match(pattern);
-
-  // If there's no match, fallback to Claude3 Sonnet as it is most likely to be
-  // available on GCP.
+  
   if (!match) {
     req.body.model = `claude-3-sonnet@${LATEST_GCP_SONNET_MINOR_VERSION}`;
     return;
@@ -171,26 +169,36 @@ function maybeReassignModel(req: Request) {
 
   const [_, _cl, instant, _v, major, _sep, minor, _ctx, name, _rev] = match;
   
-  const ver = minor ? `${major}.${minor}` : major;
-  switch (ver) {
-    case "3":
-    case "3.0":
-      if (name.includes("opus")) {
-        req.body.model = "claude-3-opus@20240229";
-      } else if (name.includes("haiku")) {
-        req.body.model = "claude-3-haiku@20240307";
-      } else {
-        req.body.model = "claude-3-sonnet@20240229";
-      }
-      return;
-    case "3.5":
-      req.body.model = "claude-3-5-sonnet@20240620";
-      return;
-  }
+// minor가 없을 경우 major만 사용
+const ver = minor ? `${major}.${minor}` : major;
 
-  // Fallback to Claude3 Sonnet
-  req.body.model = `claude-3-sonnet@${LATEST_GCP_SONNET_MINOR_VERSION}`;
-  return;
+switch (ver) {
+  case "3":
+  case "3.0":
+    if (name.includes("opus")) {
+      req.body.model = "claude-3-opus@20240229";
+    } else if (name.includes("haiku")) {
+      req.body.model = "claude-3-haiku@20240307";
+    } else {
+      // sonnet이나 다른 경우 기본 sonnet으로
+      req.body.model = "claude-3-sonnet@20240229";
+    }
+    return;
+    
+  case "3.5":
+    // 3.5 버전은 현재 모두 sonnet 계열이므로 v2 여부만 확인
+    const isV2 = model.toLowerCase().includes("-v2") || model.toLowerCase().endsWith("v2");
+    if (isV2) {
+      req.body.model = "claude-3-5-sonnet-v2@20241022";
+    } else {
+      req.body.model = "claude-3-5-sonnet@20240620";
+    }
+    return;
+    
+  default:
+    // 버전을 파싱할 수 없거나 지원하지 않는 버전인 경우 기본값으로
+    req.body.model = `claude-3-sonnet@${LATEST_GCP_SONNET_MINOR_VERSION}`;
+    return;
 }
 
 export const gcp = gcpRouter;
